@@ -243,8 +243,8 @@ def existeReviewConfirm (tracks, date_created): #Devuelve si existe o no el revi
         if tracks[i]['path']=='/px_checkout/review/confirm':
             #user_timestamp contiene la fecha del track
             user_timestamp = datetime.strptime(tracks[i]['user_timestamp'],'%Y-%m-%dt%H:%M:%S.%f%z')  
-            #En el siguiente if vemos si ese track fue en el rango horario (- 50 segundos) de la creación del pago
-            if((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) >= (date_created - timedelta(seconds = 50)).strftime('%Y-%m-%dt%H:%M:%S')) and ((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) <= (date_created + timedelta(seconds = 5)).strftime('%Y-%m-%dt%H:%M:%S')):
+            #En el siguiente if vemos si ese track fue en el rango horario (- 50 segundos + 1 minuto) de la creación del pago
+            if((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) >= (date_created - timedelta(seconds = 20)).strftime('%Y-%m-%dt%H:%M:%S')) and ((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) <= (date_created + timedelta(seconds = 60)).strftime('%Y-%m-%dt%H:%M:%S')):
                 #guardamos los datos del error y seguimos para devolver la última aparición, que es la que nos importa
                 resultado['existe'] = True
                 resultado['posicion'] = i
@@ -259,38 +259,40 @@ def existeReviewDuplicado (tracks, date_created,posiReviewOriginal): #Devuelve s
             if tracks[i]['path']=='/px_checkout/review/confirm':
                 #user_timestamp contiene la fecha del track
                 user_timestamp = datetime.strptime(tracks[i]['user_timestamp'],'%Y-%m-%dt%H:%M:%S.%f%z')  
-                #En el siguiente if vemos si ese track fue en el rango horario (- 50 segundos) de la creación del pago
-                if((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) >= (date_created - timedelta(seconds = 50)).strftime('%Y-%m-%dt%H:%M:%S')) and ((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) <= (date_created + timedelta(seconds = 5)).strftime('%Y-%m-%dt%H:%M:%S')):
+                #En el siguiente if vemos si ese track fue en el rango horario (- 50 segundos + 1 minuto) de la creación del pago
+                if((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) >= (date_created - timedelta(seconds = 20)).strftime('%Y-%m-%dt%H:%M:%S')) and ((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) <= (date_created + timedelta(seconds = 60)).strftime('%Y-%m-%dt%H:%M:%S')):
                     #guardamos los datos del error y seguimos para devolver la última aparición, que es la que nos importa
                     resultado['existe'] = True
                     resultado['posicion'] = i
                     return resultado
     return resultado
 
-def existeCongratsOff(tracks,date_created,posiConfirm):
-    #devuelve existe (true o false), path, payment_status, payment_status_detail
+def existeCongratsOff(tracks,date_created,posiConfirm,posiNula): #posiNula representa una posición que no hay que tener en cuenta (cuando la congrats ya fue para otro payment). Mandar -1 si no usamos el campo
+    #devuelve existe (true o false), posicion, path, payment_status, payment_status_detail
     resultado = {}
     resultado['existe'] = False
     user_timestamp_confirm = datetime.strptime(tracks[posiConfirm]['user_timestamp'],'%Y-%m-%dt%H:%M:%S.%f%z')
     while True:
         #user_timestamp contiene la fecha del track
         user_timestamp = datetime.strptime(tracks[posiConfirm]['user_timestamp'],'%Y-%m-%dt%H:%M:%S.%f%z')  
-        #En el siguiente if vemos si ese track fue en el rango horario (- 20 segundos, + 30 segundos) de la creación del pago
-        if((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) >= (user_timestamp_confirm - timedelta(seconds = 1)).strftime('%Y-%m-%dt%H:%M:%S')) and ((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) <= (user_timestamp_confirm + timedelta(seconds = 40)).strftime('%Y-%m-%dt%H:%M:%S')):
+        #En el siguiente if vemos si ese track fue en el rango horario (- 20 segundos, + 60 segundos) de la creación del pago
+        if((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) >= (user_timestamp_confirm - timedelta(seconds = 1)).strftime('%Y-%m-%dt%H:%M:%S')) and ((user_timestamp.strftime('%Y-%m-%dt%H:%M:%S')) <= (user_timestamp_confirm + timedelta(seconds = 60)).strftime('%Y-%m-%dt%H:%M:%S')):
             #Si el track está en horario, vemos si es un track de congrats, y si lo es devolvemos los datos que necesitamos
             if re.search('/px_checkout/result',tracks[posiConfirm]['path']) and not re.search('/abort',tracks[posiConfirm]['path']) and not re.search('/primary_action',tracks[posiConfirm]['path']) and not re.search('/continue',tracks[posiConfirm]['path']):
-                resultado['existe'] = True
-                resultado['path'] = tracks[posiConfirm]['path']
-                event = json.loads(tracks[posiConfirm]['event_data'])
-                if 'payment_status' in event:
-                    resultado['payment_status'] = event ['payment_status']
-                else:
-                    resultado['payment_status'] = None
-                if 'payment_status_detail' in event:
-                    resultado['payment_status_detail'] = event['payment_status_detail']
-                else:
-                    resultado['payment_status_detail'] = None
-                return resultado
+                if posiNula == -1 or posiConfirm != posiNula: #chequeamos que la congrats no haya sido usada en un pago anterior
+                    resultado['existe'] = True
+                    resultado['posicion'] = posiConfirm
+                    resultado['path'] = tracks[posiConfirm]['path']
+                    event = json.loads(tracks[posiConfirm]['event_data'])
+                    if 'payment_status' in event:
+                        resultado['payment_status'] = event ['payment_status']
+                    else:
+                        resultado['payment_status'] = None
+                    if 'payment_status_detail' in event:
+                        resultado['payment_status_detail'] = event['payment_status_detail']
+                    else:
+                        resultado['payment_status_detail'] = None
+                    return resultado
             posiConfirm = posiConfirm + 1
             if posiConfirm == len(tracks):
                 return resultado
@@ -406,7 +408,7 @@ def off_tracks(payment):
         if review['existe']:
             result['tenemosDatos'] = True
             #si hubo review/confirm, vamos a ver la congrats
-            congrats = existeCongratsOff(tracks,date_created,review['posicion'])
+            congrats = existeCongratsOff(tracks,date_created,review['posicion'],-1)
             if congrats['existe']:
                 result['congrats'] = {}
                 result['congrats']['mostrada'] = True
@@ -441,8 +443,6 @@ def off_duplicados(payment_original,payment_duplicado):
         review_original = existeReviewConfirm(tracks,date_created_original)
         if review_original['existe']: #Si hay para el original, vamos a ver si hay para el duplicado
             result['tenemosDatos'] = True
-            print('llego al segundo')
-            print(date_created_duplicado)
             review_duplicado = existeReviewDuplicado(tracks,date_created_duplicado,review_original['posicion'])
             if review_duplicado['existe']:
                 result['duplicados'] = False
@@ -454,7 +454,11 @@ def off_duplicados(payment_original,payment_duplicado):
                 for i in range (len(payments)):
                     datos = {}
                     datos['id'] = payments[i]
-                    congrats = existeCongratsOff(tracks,creaciones[i],confirms[i])
+                    if i==0:
+                        congrats = existeCongratsOff(tracks,creaciones[i],confirms[i],-1)
+                    else:
+                        #Al hacer este llamado, congrats todavía tiene el valor de la pasada anterior. Entonces mandamos la posición de la congrats anterior para que no sea tomada en cuenta
+                        congrats = existeCongratsOff(tracks,creaciones[i],confirms[i],congrats['posicion']) 
                     datos['congrats'] = {}
                     datos['congrats']['mostrada'] = congrats['existe']
                     if congrats['existe']:
