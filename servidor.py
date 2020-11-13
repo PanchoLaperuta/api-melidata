@@ -457,8 +457,12 @@ def off_duplicados(payment_original,payment_duplicado):
                     if i==0:
                         congrats = existeCongratsOff(tracks,creaciones[i],confirms[i],-1)
                     else:
-                        #Al hacer este llamado, congrats todavía tiene el valor de la pasada anterior. Entonces mandamos la posición de la congrats anterior para que no sea tomada en cuenta
-                        congrats = existeCongratsOff(tracks,creaciones[i],confirms[i],congrats['posicion']) 
+                        #Al hacer este llamado, congrats todavía tiene el valor de la pasada anterior. 
+                        #Entonces, si existe, mandamos la posición de la congrats anterior para que no sea tomada en cuenta
+                        if congrats['existe']:
+                            congrats = existeCongratsOff(tracks,creaciones[i],confirms[i],congrats['posicion']) 
+                        else:
+                            congrats = existeCongratsOff(tracks,creaciones[i],confirms[i],-1)
                     datos['congrats'] = {}
                     datos['congrats']['mostrada'] = congrats['existe']
                     if congrats['existe']:
